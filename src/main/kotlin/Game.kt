@@ -1,10 +1,13 @@
 class Game {
-    val SUITS = arrayOf("♡", "♤", "♧", "♢")
-    val VALUES = arrayOf(2,3,4,5,6,7,8,9,10,11,12,13,14)
-    val player1 = Player("Bilbo")
-    val player2 = Player("Gandalf")
+    private val SUITS = arrayOf("♡", "♤", "♧", "♢")
+    private val VALUES = arrayOf(2,3,4,5,6,7,8,9,10,11,12,13,14)
+    private val player1 = Player("Bilbo")
+    private val player2 = Player("Gandalf")
 
-    fun createDeck(): MutableList<Card> {
+    /**
+     * @return MutableList<Card> representing playing cards
+     */
+    private fun createDeck(): MutableList<Card> {
         val deck: MutableList<Card> = mutableListOf()
         for (suit in SUITS) {
             for (value in VALUES) deck.add(Card(value, suit))
@@ -12,6 +15,25 @@ class Game {
         return deck
     }
 
+    /**
+     * @return Boolean true if a winner has been found
+     */
+    private fun checkForWinner(): Boolean {
+        return (player1.deck.size == 0 || player2.deck.size == 0)
+    }
+
+    /**
+     * Prints winner name to console
+     */
+    private fun declareWinner() {
+        val winner = if (player1.deck.size == 0) player2 else player1
+        println("${winner.name} Won!")
+    }
+
+    /**
+     * Start running the game rounds
+     * It will run until a player has no cards left
+     */
     fun start() {
         val deck = createDeck()
         deck.shuffle()
@@ -19,14 +41,20 @@ class Game {
 
         var round = 0
         do {
+            if(checkForWinner()) break
             println("Round ${++round}")
             println("------------")
         } while(playRound())
 
+        declareWinner()
+
         println("The game lasted ${round} rounds!")
     }
 
-    fun deal(deck: MutableList<Card>, test: Boolean = false) {
+    /**
+     * Deal out the cards 1 by 1 to each player
+     */
+    private fun deal(deck: MutableList<Card>, test: Boolean = false) {
         // For fun, preload with war
         if ( test ) {
             player1.deck.add(Card(7, "♡"))
@@ -46,55 +74,82 @@ class Game {
     }
 
     /**
+     * Handle giving cards to winner when a player runs
+     * out of cards in their deck
+     */
+    private fun playerRanOut(p1success: Boolean) {
+        val (loser, winner) =
+                if ( !p1success ) Pair(player1, player2)
+                else Pair(player2, player1)
+
+        println("${loser.name} is out of cards!")
+        winner.takeCardsFrom(loser.playPile)
+    }
+
+    /**
      * @return Boolean false if any player can't place a card
      * returning false signifies the round and game should end
      */
-    fun playCards(faceDown: Boolean = false): Boolean {
+    private fun playCards(): Boolean {
         val p1success = player1.playCard()
         val p2success = player2.playCard()
 
-        if ( !p1success ) println("${player1.name} is out of cards!")
-        if ( !p2success ) println("${player2.name} is out of cards!")
+        if ( !p1success || !p2success ) {
+            playerRanOut(p1success)
+        } else printCompare(player1.card, player2.card)
 
-        // Both players ran out of cards??? This is bad, game breaking logic
-        if (!p1success && !p2success) return false
+        return (p1success && p2success)
+    }
 
-        // See if either player should by default steal cards
-        if (!p1success) player2.takeCardsFrom(player1.playPile)
-        if (!p2success) player1.takeCardsFrom(player2.playPile)
+    /**
+     * @return Boolean false if any player can't place a card
+     * returning false signifies the round and game should end
+     */
+    private fun playCardFaceDown(): Boolean {
+        val p1success = player1.playCard() && player1.deck.size > 0
+        val p2success = player2.playCard() && player1.deck.size > 0
 
-        if ( faceDown ) {
-            printFaceDown()
-        } else {
-            printCompare(player1.card, player2.card)
+        if ( !p1success || !p2success ) {
+            playerRanOut(p1success)
+        } else printFaceDown()
+
+        return (p1success && p2success)
+    }
+
+    /**
+     * @return Boolean false means game should end
+     */
+    private fun playRound(): Boolean {
+        if ( player1.deck.size == 0 || player2.deck.size == 0 ) return false
+
+        // Play initial cards
+        // End game if a player ran out
+        if ( !playCards() ) return false
+
+        when {
+            player1.card.value > player2.card.value -> player1.takeCardsFrom(player2.playPile)
+            player1.card.value < player2.card.value -> player2.takeCardsFrom(player1.playPile)
+            else -> {
+                // Start a War
+                // Play the faceDown cards and start the next face up round
+                // Or if someone ran out of cards end the game
+                if ( !playCardFaceDown() ) return false
+                playRound()
+            }
         }
 
         return true
     }
 
-    // return false means the game should end
-    // return true means the game should continue
-    fun playRound(): Boolean {
-        if ( player1.deck.size == 0 || player2.deck.size == 0 ) return false
-
-        if ( !playCards() ) return false // One of the players couldn't place a card
-
-        if ( player1.card.value == player2.card.value ) {
-            if ( !playCards(true) ) return false else playRound()
-        } else if ( player1.card.value > player2.card.value ) {
-            player1.takeCardsFrom(player2.playPile)
-        } else if ( player1.card.value < player2.card.value ) {
-            player2.takeCardsFrom(player1.playPile)
-        }
-
-        if ( player1.deck.size == 0 || player2.deck.size == 0 ) return false
-
-        return true
-    }
-
-    fun printCompare(card: Card, card2: Card) =
+    /**
+     * Print what cards are in play
+     */
+    private fun printCompare(card: Card, card2: Card) =
             println("(${player1.name}) ${card.display} vs ${card2.display} (${player2.name})")
 
-    fun printFaceDown() =
+    /**
+     * Print the war cards
+     */
+    private fun printFaceDown() =
             println("(${player1.name}) ? vs ? (${player2.name})")
 }
