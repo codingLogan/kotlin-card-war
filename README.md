@@ -5,4 +5,9 @@ The rules for how to play the real game with actual cards can be found on [Bicyc
 
 If you look over the code and notice something is incorrect, feel free to submit a change and PR, I'd love the feedback.
 
+# Files
+All source code for the game exists in /src/main/kotlin
+
+Most of the other files are all build and IDE generated files, etc.
+
 ## Enjoy
