@@ -1,8 +1,8 @@
 class Game {
     val SUITS = arrayOf("♡", "♤", "♧", "♢")
     val VALUES = arrayOf(2,3,4,5,6,7,8,9,10,11,12,13,14)
-    val player1Deck: MutableList<Card> = mutableListOf()
-    val player2Deck: MutableList<Card> = mutableListOf()
+    val player1 = Player("Bilbo")
+    val player2 = Player("Gandalf")
 
     fun createDeck(): MutableList<Card> {
         val deck: MutableList<Card> = mutableListOf()
@@ -16,68 +16,85 @@ class Game {
         val deck = createDeck()
         deck.shuffle()
         deal(deck)
-        playRound(player1Deck, player2Deck)
+
+        var round = 0
+        do {
+            println("Round ${++round}")
+            println("------------")
+        } while(playRound())
+
+        println("The game lasted ${round} rounds!")
     }
 
-    fun deal(deck: MutableList<Card>) {
-        // Test war
-        player1Deck.add(Card(5, "♡"))
-        player2Deck.add(Card(5, "♡"))
+    fun deal(deck: MutableList<Card>, test: Boolean = false) {
+        // For fun, preload with war
+        if ( test ) {
+            player1.deck.add(Card(7, "♡"))
+            player1.deck.add(Card(3, "♡"))
+            player1.deck.add(Card(6, "♡"))
+
+            player2.deck.add(Card(7, "♤"))
+            player2.deck.add(Card(2, "♤"))
+            player2.deck.add(Card(8, "♤"))
+
+            return
+        }
 
         for ((index, card) in deck.withIndex()) {
-            if (index % 2 == 0) player1Deck.add(card) else player2Deck.add(card)
+            if (index % 2 == 0) player1.deck.add(card) else player2.deck.add(card)
         }
     }
 
-    fun playRound(deck1: MutableList<Card>, deck2: MutableList<Card>): Boolean {
-        val winnersPile: MutableList<Card> = mutableListOf()
+    /**
+     * @return Boolean false if any player can't place a card
+     * returning false signifies the round and game should end
+     */
+    fun playCards(faceDown: Boolean = false): Boolean {
+        val p1success = player1.playCard()
+        val p2success = player2.playCard()
 
-        // Check the top cards for each player before adding to list
-        while (deck1.first().value == deck2.first().value) {
-            // Add the player cards to the pile
-            // If one player runs out of cards, the other wins
-            printCompare(deck1.first(), deck2.first())
-            war(winnersPile, deck1, deck2)
+        if ( !p1success ) println("${player1.name} is out of cards!")
+        if ( !p2success ) println("${player2.name} is out of cards!")
+
+        // Both players ran out of cards??? This is bad, game breaking logic
+        if (!p1success && !p2success) return false
+
+        // See if either player should by default steal cards
+        if (!p1success) player2.takeCardsFrom(player1.playPile)
+        if (!p2success) player1.takeCardsFrom(player2.playPile)
+
+        if ( faceDown ) {
+            printFaceDown()
+        } else {
+            printCompare(player1.card, player2.card)
         }
 
-        // Get ready for winners pile of cards
-        val player1Card = deck1.removeFirst()
-        val player2Card = deck2.removeFirst()
-        winnersPile.add(player1Card)
-        winnersPile.add(player2Card)
-
-        printCompare(player1Card, player2Card)
-        if (player1Card.value > player2Card.value) winRound(winnersPile, player1Deck, "Player 1")
-        else winRound(winnersPile, player2Deck, "Player 2")
-
-        // return true means the game should continue
         return true
     }
 
-    fun winRound(pile: MutableList<Card>, playerDeck: MutableList<Card>, playerName: String) {
-        println("$playerName wins the round and gains ${pile.size} cards!")
-        playerDeck.addAll(pile)
-        println("Player 1: ${player1Deck.size} cards")
-        println("Player 2: ${player2Deck.size} cards\n")
+    // return false means the game should end
+    // return true means the game should continue
+    fun playRound(): Boolean {
+        if ( player1.deck.size == 0 || player2.deck.size == 0 ) return false
+
+        if ( !playCards() ) return false // One of the players couldn't place a card
+
+        if ( player1.card.value == player2.card.value ) {
+            if ( !playCards(true) ) return false else playRound()
+        } else if ( player1.card.value > player2.card.value ) {
+            player1.takeCardsFrom(player2.playPile)
+        } else if ( player1.card.value < player2.card.value ) {
+            player2.takeCardsFrom(player1.playPile)
+        }
+
+        if ( player1.deck.size == 0 || player2.deck.size == 0 ) return false
+
+        return true
     }
 
-    fun removeCards(winnersPile: MutableList<Card>, deck1: MutableList<Card>, deck2: MutableList<Card>) {
-        // Remove top card from players
-        if ( deck1.size == 0 ) endGame("player1 wins because player 2 couldn't war anymore")
-        winnersPile.add(deck1.removeFirst())
+    fun printCompare(card: Card, card2: Card) =
+            println("(${player1.name}) ${card.display} vs ${card2.display} (${player2.name})")
 
-        if ( deck2.size == 0 ) endGame("player2 wins because player 1 couldn't war anymore")
-        winnersPile.add(deck2.removeFirst())
-    }
-
-    fun war(winnersPile: MutableList<Card>, deck1: MutableList<Card>, deck2: MutableList<Card>) {
-        println("War!!!, each player places a face down card into the pile")
-        repeat (2) {removeCards(winnersPile, deck1, deck2)}
-    }
-
-    fun printCompare(card: Card, card2: Card) = println("(Player 1) ${card.display} vs ${card2.display} (Player 2)")
-
-    fun endGame(message: String) {
-        println(message)
-    }
+    fun printFaceDown() =
+            println("(${player1.name}) ? vs ? (${player2.name})")
 }
